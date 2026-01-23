@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Report {
+  id        String       @id @default(cuid())
+  title     String?
+  status    String       @default("draft")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  messages  Message[]
+  draft     TicketDraft?
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  reportId  String
+  role      String   // "user" | "assistant"
+  content   String
+  createdAt DateTime @default(now())
+  report    Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+}
+
+model TicketDraft {
+  id        String   @id @default(cuid())
+  reportId  String   @unique
+  fields    String   // JSON string of extracted fields
+  updatedAt DateTime @updatedAt
+  report    Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+}
