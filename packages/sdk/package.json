@@ -1,0 +1,55 @@
+{
+  "name": "bug-to-ticket-sdk",
+  "version": "0.1.1",
+  "description": "SDK for capturing bugs and generating tickets via Bug-to-Ticket API",
+  "author": "Filip Ljoljic",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/filipljoljic/bug-to-ticket.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/filipljoljic/bug-to-ticket#readme",
+  "bugs": {
+    "url": "https://github.com/filipljoljic/bug-to-ticket/issues"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "bug-tracking",
+    "ticket",
+    "error-reporting",
+    "sdk",
+    "bug-report",
+    "ai"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "typescript": ">=4.7.0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  }
+}

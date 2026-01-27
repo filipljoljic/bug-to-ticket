@@ -2,14 +2,19 @@
   "name": "bug-to-ticket",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:sdk": "npm run build --workspace=bug-to-ticket-sdk",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
+    "@octokit/rest": "^22.0.1",
     "@prisma/client": "^5.22.0",
     "date-fns": "^4.1.0",
     "docx": "^9.5.1",

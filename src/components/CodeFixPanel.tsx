@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface FixResult {
   componentPath: string;
@@ -8,6 +8,20 @@ interface FixResult {
   originalCode: string;
   fixedCode: string;
   applied: boolean;
+}
+
+interface PRInfo {
+  number: number;
+  title: string;
+  head: string;
+  url: string;
+}
+
+interface GitHubResult {
+  success: boolean;
+  commit: { sha: string; url: string; message: string };
+  pr: PRInfo;
+  message: string;
 }
 
 interface CodeFixPanelProps {
@@ -27,10 +41,38 @@ export default function CodeFixPanel({
   const [error, setError] = useState<string | null>(null);
   const [showDiff, setShowDiff] = useState(true);
 
+  // GitHub integration state
+  const [applyMode, setApplyMode] = useState<"local" | "github">("local");
+  const [githubToken, setGithubToken] = useState("");
+  const [repoUrl, setRepoUrl] = useState("");
+  const [openPRs, setOpenPRs] = useState<PRInfo[]>([]);
+  const [selectedPR, setSelectedPR] = useState<number | "new">("new");
+  const [isLoadingPRs, setIsLoadingPRs] = useState(false);
+  const [githubResult, setGithubResult] = useState<GitHubResult | null>(null);
+  const [repoInfo, setRepoInfo] = useState<{ owner: string; repo: string } | null>(null);
+
+  // Load GitHub token from localStorage on mount
+  useEffect(() => {
+    const savedToken = localStorage.getItem("github_token");
+    const savedRepo = localStorage.getItem("github_repo");
+    if (savedToken) setGithubToken(savedToken);
+    if (savedRepo) setRepoUrl(savedRepo);
+  }, []);
+
+  // Save token and repo to localStorage when changed
+  useEffect(() => {
+    if (githubToken) localStorage.setItem("github_token", githubToken);
+  }, [githubToken]);
+
+  useEffect(() => {
+    if (repoUrl) localStorage.setItem("github_repo", repoUrl);
+  }, [repoUrl]);
+
   const handleGenerateFix = async () => {
     setIsGenerating(true);
     setError(null);
     setFixResult(null);
+    setGithubResult(null);
 
     try {
       const res = await fetch(`/api/reports/${reportId}/fix`, {
@@ -51,7 +93,49 @@ export default function CodeFixPanel({
     }
   };
 
+  const handleLoadPRs = async () => {
+    if (!githubToken || !repoUrl) {
+      setError("GitHub token and repository URL are required");
+      return;
+    }
+
+    setIsLoadingPRs(true);
+    setError(null);
+
+    try {
+      const res = await fetch(
+        `/api/reports/${reportId}/fix-github?repo=${encodeURIComponent(repoUrl)}`,
+        {
+          headers: { "x-github-token": githubToken },
+        }
+      );
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to load PRs");
+      }
+
+      const data = await res.json();
+      setOpenPRs(data.prs);
+      setRepoInfo({ owner: data.owner, repo: data.repo });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load PRs");
+    } finally {
+      setIsLoadingPRs(false);
+    }
+  };
+
   const handleApplyFix = async () => {
+    if (!fixResult) return;
+
+    if (applyMode === "local") {
+      await applyFixLocally();
+    } else {
+      await applyFixToGitHub();
+    }
+  };
+
+  const applyFixLocally = async () => {
     if (!fixResult) return;
 
     setIsApplying(true);
@@ -76,6 +160,50 @@ export default function CodeFixPanel({
       onFixApplied();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to apply fix");
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  const applyFixToGitHub = async () => {
+    if (!fixResult || !repoInfo) return;
+
+    if (!githubToken) {
+      setError("GitHub token is required");
+      return;
+    }
+
+    setIsApplying(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/reports/${reportId}/fix-github`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-github-token": githubToken,
+        },
+        body: JSON.stringify({
+          owner: repoInfo.owner,
+          repo: repoInfo.repo,
+          prNumber: selectedPR === "new" ? undefined : selectedPR,
+          createNewPR: selectedPR === "new",
+          componentPath: fixResult.componentPath,
+          fixedCode: fixResult.fixedCode,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to apply fix to GitHub");
+      }
+
+      const result: GitHubResult = await res.json();
+      setGithubResult(result);
+      setFixResult({ ...fixResult, applied: true });
+      onFixApplied();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to apply fix to GitHub");
     } finally {
       setIsApplying(false);
     }
@@ -154,15 +282,49 @@ export default function CodeFixPanel({
               </code>
             </div>
 
-            {/* Applied status */}
-            {fixResult.applied && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2">
-                <span>✓</span>
-                Fix has been applied! Refresh the playground to see the changes.
+            {/* GitHub success message */}
+            {githubResult && (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+                <div className="flex items-center gap-2 font-medium">
+                  <span>✓</span>
+                  {githubResult.message}
+                </div>
+                <div className="mt-2 text-sm space-y-1">
+                  <p>
+                    <span className="font-medium">PR:</span>{" "}
+                    <a
+                      href={githubResult.pr.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-green-800 underline hover:text-green-900"
+                    >
+                      #{githubResult.pr.number} - {githubResult.pr.title}
+                    </a>
+                  </p>
+                  <p>
+                    <span className="font-medium">Commit:</span>{" "}
+                    <a
+                      href={githubResult.commit.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-green-800 underline hover:text-green-900"
+                    >
+                      {githubResult.commit.sha.substring(0, 7)}
+                    </a>
+                  </p>
+                </div>
               </div>
             )}
 
-            {/* Toggle buttons */}
+            {/* Local applied status */}
+            {fixResult.applied && !githubResult && (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2">
+                <span>✓</span>
+                Fix has been applied locally! Refresh the playground to see the changes.
+              </div>
+            )}
+
+            {/* Toggle buttons for code view */}
             <div className="flex gap-2">
               <button
                 onClick={() => setShowDiff(true)}
@@ -203,32 +365,156 @@ export default function CodeFixPanel({
               </button>
             </div>
 
-            {/* Apply button */}
+            {/* Apply fix section */}
             {!fixResult.applied && (
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setFixResult(null)}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleApplyFix}
-                  disabled={isApplying}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
-                >
-                  {isApplying ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Applying...
-                    </>
-                  ) : (
-                    <>
-                      <span>✓</span>
-                      Apply Fix
-                    </>
-                  )}
-                </button>
+              <div className="border-t border-gray-200 pt-4 mt-4 space-y-4">
+                {/* Apply mode toggle */}
+                <div className="flex items-center gap-4">
+                  <span className="text-sm font-medium text-gray-700">Apply to:</span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setApplyMode("local")}
+                      className={`px-3 py-1.5 text-sm rounded-lg ${
+                        applyMode === "local"
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      }`}
+                    >
+                      Local Files
+                    </button>
+                    <button
+                      onClick={() => setApplyMode("github")}
+                      className={`px-3 py-1.5 text-sm rounded-lg ${
+                        applyMode === "github"
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      }`}
+                    >
+                      GitHub PR
+                    </button>
+                  </div>
+                </div>
+
+                {/* GitHub configuration */}
+                {applyMode === "github" && (
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        GitHub Personal Access Token
+                      </label>
+                      <input
+                        type="password"
+                        value={githubToken}
+                        onChange={(e) => setGithubToken(e.target.value)}
+                        placeholder="ghp_xxxxxxxxxxxx"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Needs repo scope.{" "}
+                        <a
+                          href="https://github.com/settings/tokens/new?scopes=repo"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          Create token
+                        </a>
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Repository URL
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={repoUrl}
+                          onChange={(e) => setRepoUrl(e.target.value)}
+                          placeholder="https://github.com/owner/repo or owner/repo"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                        <button
+                          onClick={handleLoadPRs}
+                          disabled={isLoadingPRs || !githubToken || !repoUrl}
+                          className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center gap-2"
+                        >
+                          {isLoadingPRs ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              Loading...
+                            </>
+                          ) : (
+                            "Load PRs"
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {repoInfo && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Target PR
+                        </label>
+                        <select
+                          value={selectedPR}
+                          onChange={(e) =>
+                            setSelectedPR(
+                              e.target.value === "new" ? "new" : parseInt(e.target.value, 10)
+                            )
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value="new">Create new PR</option>
+                          {openPRs.map((pr) => (
+                            <option key={pr.number} value={pr.number}>
+                              #{pr.number} - {pr.title} ({pr.head})
+                            </option>
+                          ))}
+                        </select>
+                        {openPRs.length === 0 && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            No open PRs found. A new PR will be created.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Action buttons */}
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => {
+                      setFixResult(null);
+                      setGithubResult(null);
+                    }}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleApplyFix}
+                    disabled={isApplying || (applyMode === "github" && !repoInfo)}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {isApplying ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Applying...
+                      </>
+                    ) : (
+                      <>
+                        <span>✓</span>
+                        {applyMode === "local"
+                          ? "Apply Fix Locally"
+                          : selectedPR === "new"
+                          ? "Create PR with Fix"
+                          : "Push to PR"}
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             )}
           </div>

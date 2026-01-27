@@ -39,7 +39,7 @@ export async function GET(
     // Create filename from title
     const filename = `${fields.title.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 50)}_ticket.docx`;
 
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

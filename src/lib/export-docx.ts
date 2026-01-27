@@ -116,7 +116,7 @@ export async function generateTicketDocument(
               new TableRow({
                 children: [
                   new TableCell({
-                    children: [new Paragraph({ text: "OS", bold: true } as Parameters<typeof Paragraph>[0])],
+                    children: [new Paragraph({ children: [new TextRun({ text: "OS", bold: true })] })],
                     width: { size: 25, type: WidthType.PERCENTAGE },
                   }),
                   new TableCell({
@@ -129,7 +129,7 @@ export async function generateTicketDocument(
               new TableRow({
                 children: [
                   new TableCell({
-                    children: [new Paragraph({ text: "Browser", bold: true } as Parameters<typeof Paragraph>[0])],
+                    children: [new Paragraph({ children: [new TextRun({ text: "Browser", bold: true })] })],
                   }),
                   new TableCell({
                     children: [
@@ -141,7 +141,7 @@ export async function generateTicketDocument(
               new TableRow({
                 children: [
                   new TableCell({
-                    children: [new Paragraph({ text: "Device", bold: true } as Parameters<typeof Paragraph>[0])],
+                    children: [new Paragraph({ children: [new TextRun({ text: "Device", bold: true })] })],
                   }),
                   new TableCell({
                     children: [
@@ -153,7 +153,7 @@ export async function generateTicketDocument(
               new TableRow({
                 children: [
                   new TableCell({
-                    children: [new Paragraph({ text: "App Version", bold: true } as Parameters<typeof Paragraph>[0])],
+                    children: [new Paragraph({ children: [new TextRun({ text: "App Version", bold: true })] })],
                   }),
                   new TableCell({
                     children: [

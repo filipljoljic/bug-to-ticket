@@ -30,7 +30,7 @@ export default function TicketDraftEditor({
 
   const handleChange = (
     field: keyof TicketDraftFields,
-    value: string | string[] | number | { [key: string]: string | null }
+    value: string | string[] | number | null | { [key: string]: string | null }
   ) => {
     if (!localDraft) return;
 
