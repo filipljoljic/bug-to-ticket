@@ -2,7 +2,11 @@
 
 import { useState, useEffect } from "react";
 
-export function BrokenModal() {
+interface BrokenModalProps {
+  backdropColor?: "default" | "white" | "transparent";
+}
+
+export function BrokenModal({ backdropColor = "default" }: BrokenModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [modalCount, setModalCount] = useState(0);
 
@@ -39,6 +43,18 @@ export function BrokenModal() {
     }
   };
 
+  const getBackdropClassName = () => {
+    const baseClasses = "absolute inset-0";
+    switch (backdropColor) {
+      case "white":
+        return `${baseClasses} bg-white bg-opacity-80`;
+      case "transparent":
+        return `${baseClasses} bg-transparent`;
+      default:
+        return `${baseClasses} bg-black bg-opacity-50`;
+    }
+  };
+
   return (
     <div className="space-y-4">
       <h3 className="font-medium text-gray-900">Modal Dialog</h3>
@@ -46,12 +62,31 @@ export function BrokenModal() {
         Click to open a modal dialog.
       </p>
 
-      <button
-        onClick={openModal}
-        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-      >
-        Open Modal
-      </button>
+      <div className="flex gap-2 flex-wrap">
+        <button
+          onClick={openModal}
+          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+        >
+          Open Modal
+        </button>
+      </div>
+
+      <div className="text-sm text-gray-600">
+        <label className="block mb-2">Backdrop Color:</label>
+        <select 
+          value={backdropColor} 
+          onChange={(e) => {}}
+          className="border rounded px-2 py-1"
+          disabled
+        >
+          <option value="default">Default (Dark)</option>
+          <option value="white">White</option>
+          <option value="transparent">Transparent</option>
+        </select>
+        <p className="text-xs text-gray-500 mt-1">
+          Prop: backdropColor="{backdropColor}"
+        </p>
+      </div>
 
       {modalCount > 1 && (
         <p className="text-sm text-orange-600">
@@ -62,7 +97,7 @@ export function BrokenModal() {
       {isOpen && (
         <div className="fixed inset-0 z-50">
           <div 
-            className="absolute inset-0 bg-black bg-opacity-50"
+            className={getBackdropClassName()}
             onClick={handleBackdropClick}
           />
           
