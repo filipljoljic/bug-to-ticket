@@ -2,34 +2,27 @@
 
 import { useState, useEffect } from "react";
 
-/**
- * BROKEN COMPONENT: Modal Dialog
- * 
- * Bugs:
- * 1. Close button doesn't work (wrong handler)
- * 2. Clicking outside doesn't close the modal
- * 3. Escape key doesn't work
- * 4. Multiple modals can stack on top of each other
- * 5. Scrolling is not locked when modal is open
- */
 export function BrokenModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [modalCount, setModalCount] = useState(0);
 
-  // BUG: This effect does nothing useful
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        // BUG: Does nothing, should close modal
-        console.log("Escape pressed but modal stays open");
+        setIsOpen(false);
       }
     };
     
-    // BUG: Never actually adds the listener
+    if (isOpen) {
+      document.addEventListener("keydown", handleEscape);
+      document.body.style.overflow = "hidden";
+    }
+    
     return () => {
-      window.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("keydown", handleEscape);
+      document.body.style.overflow = "unset";
     };
-  }, []);
+  }, [isOpen]);
 
   const openModal = () => {
     setIsOpen(true);
@@ -37,8 +30,13 @@ export function BrokenModal() {
   };
 
   const closeModal = () => {
-    // BUG: This function exists but isn't connected to the close button correctly
     setIsOpen(false);
+  };
+
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      closeModal();
+    }
   };
 
   return (
@@ -63,19 +61,16 @@ export function BrokenModal() {
 
       {isOpen && (
         <div className="fixed inset-0 z-50">
-          {/* Backdrop - BUG: onClick does nothing */}
           <div 
             className="absolute inset-0 bg-black bg-opacity-50"
-            onClick={() => console.log("Backdrop clicked but modal stays")}
+            onClick={handleBackdropClick}
           />
           
-          {/* Modal Content */}
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl p-6 w-96">
             <div className="flex justify-between items-center mb-4">
               <h4 className="text-lg font-semibold">Modal Title</h4>
-              {/* BUG: onClick handler is wrong - calls openModal instead of closeModal */}
               <button
-                onClick={openModal}
+                onClick={closeModal}
                 className="text-gray-500 hover:text-gray-700"
               >
                 ✕
@@ -90,13 +85,10 @@ export function BrokenModal() {
               <li>Clicking outside the modal</li>
               <li>Pressing the Escape key</li>
             </ul>
-            <p className="text-red-500 text-sm">
-              (Spoiler: None of these work properly!)
-            </p>
             
             <div className="mt-4 flex justify-end gap-2">
               <button
-                onClick={() => console.log("Cancel clicked")}
+                onClick={closeModal}
                 className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
               >
                 Cancel
@@ -105,7 +97,7 @@ export function BrokenModal() {
                 onClick={closeModal}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
-                Confirm (this one works)
+                Confirm
               </button>
             </div>
           </div>
