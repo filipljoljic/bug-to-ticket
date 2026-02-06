@@ -2,45 +2,30 @@
 
 import { useState } from "react";
 
-/**
- * BROKEN COMPONENT: Counter
- * 
- * Bugs:
- * 1. Decrement goes below 0 (should stop at 0)
- * 2. Increment by 10 actually adds a random number
- * 3. Reset doesn't work properly (sets to NaN sometimes)
- * 4. Display shows wrong number after rapid clicks
- */
 export function BrokenCounter() {
   const [count, setCount] = useState(0);
   const [history, setHistory] = useState<number[]>([0]);
 
   const increment = () => {
-    setCount((prev) => prev + 1);
-    setHistory((prev) => [...prev, count + 1]);
+    const newCount = count + 1;
+    setCount(newCount);
+    setHistory((prev) => [...prev, newCount]);
   };
 
   const decrement = () => {
-    // BUG: No check for going below 0
-    setCount((prev) => prev - 1);
-    setHistory((prev) => [...prev, count - 1]);
+    const newCount = Math.max(0, count - 1);
+    setCount(newCount);
+    setHistory((prev) => [...prev, newCount]);
   };
 
   const incrementByTen = () => {
-    // BUG: Adds random number instead of 10
-    const randomAdd = Math.floor(Math.random() * 20);
-    setCount((prev) => prev + randomAdd);
-    setHistory((prev) => [...prev, count + randomAdd]);
+    const newCount = count + 10;
+    setCount(newCount);
+    setHistory((prev) => [...prev, newCount]);
   };
 
   const reset = () => {
-    // BUG: Sometimes sets to NaN
-    const shouldBreak = Math.random() > 0.5;
-    if (shouldBreak) {
-      setCount(parseInt("not a number")); // This will be NaN
-    } else {
-      setCount(0);
-    }
+    setCount(0);
     setHistory([0]);
   };
 
